@@ -13,11 +13,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const isFirebaseConfigured = () => {
-  const key = import.meta.env.VITE_FIREBASE_API_KEY;
-  return key && key !== 'demo-key' && key !== 'your_api_key_here' && key.length > 10;
-};
-
 let app, auth, googleProvider, db, firestore;
 
 try {
@@ -29,6 +24,20 @@ try {
 } catch (e) {
   console.warn('Firebase initialization failed — using demo mode:', e.message);
 }
+
+// Check AFTER initialization so `auth` is defined when this runs
+export const isFirebaseConfigured = () => {
+  const key = import.meta.env.VITE_FIREBASE_API_KEY;
+  const keyValid = key && key !== 'demo-key' && key !== 'your_api_key_here' && key.length > 10;
+  return !!(keyValid && auth);
+};
+
+// Pre-computed stable flag — evaluated once at module load time (after init)
+export const FIREBASE_CONFIGURED = (() => {
+  const key = import.meta.env.VITE_FIREBASE_API_KEY;
+  const keyValid = key && key !== 'demo-key' && key !== 'your_api_key_here' && key.length > 10;
+  return !!(keyValid && auth);
+})();
 
 export { auth, googleProvider, db, firestore };
 export default app;
