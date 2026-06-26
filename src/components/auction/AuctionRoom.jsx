@@ -277,15 +277,15 @@ const STYLES = `
   }
   .ar-top-accent.urgent { background: linear-gradient(90deg, transparent, #ef4444, transparent); }
 
-  /* Timer overlay on card — left side */
+  /* Timer overlay on card — left side inside */
   .ar-timer-wrap {
     position: absolute;
-    left: -14px; top: 40%;
+    left: 12px; top: 40%;
     transform: translateY(-50%);
     z-index: 20;
     display: flex; flex-direction: column; align-items: center; gap: 0.4vh;
   }
-  @media (min-width: 400px) { .ar-timer-wrap { left: -18px; } }
+  @media (min-width: 400px) { .ar-timer-wrap { left: 14px; } }
   .ar-timer-ring {
     width: 7vh; height: 7vh; border-radius: 50%;
     background: var(--bg-surface);
@@ -762,24 +762,19 @@ const interpolateColor = (color1, color2, factor) => {
 };
 
 // ── Timer Ring ─────────────────────────────────────────────────────────────────
-function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd }) {
-  const circleRef = useRef(null);
+function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd, serverTimeOffset = 0 }) {
   const textRef = useRef(null);
   const wrapRef = useRef(null);
-
-  const r = 25;
-  const circ = 2 * Math.PI * r;
 
   useEffect(() => {
     let animId;
 
     const updateTimer = () => {
-      const now = Date.now();
+      const now = Date.now() + serverTimeOffset;
       const remainingMs = Math.max(0, (timerEnd || 0) - now);
       const remainingSecs = Math.ceil(remainingMs / 1000);
 
       const pct = Math.max(0, remainingMs / (totalTime * 1000));
-      const offset = circ * (1 - pct);
 
       // Smooth color interpolation
       let color = '#00e676';
@@ -797,11 +792,6 @@ function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd }) {
       const glowColor = color.replace('rgb', 'rgba').replace(')', ', 0.45)');
       const shadowStyle = `0 0 16px ${glowColor}, inset 0 0 10px ${glowColor}, 0 4px 20px rgba(0,0,0,0.7)`;
 
-      // Write directly to the DOM for buttery 60 FPS sweeps without parent re-renders
-      if (circleRef.current) {
-        circleRef.current.style.strokeDashoffset = offset;
-        circleRef.current.style.stroke = color;
-      }
       if (textRef.current) {
         textRef.current.textContent = remainingSecs;
         textRef.current.style.color = color;
@@ -828,10 +818,9 @@ function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd }) {
       animId = requestAnimationFrame(updateTimer);
     } else {
       // Draw static frame (paused/idle)
-      const remainingMs = Math.max(0, (timerEnd || 0) - Date.now());
+      const remainingMs = Math.max(0, (timerEnd || 0) - (Date.now() + serverTimeOffset));
       const remainingSecs = timerEnd ? Math.ceil(remainingMs / 1000) : timeLeft;
       const pct = timerEnd ? Math.max(0, remainingMs / (totalTime * 1000)) : Math.max(0, timeLeft / totalTime);
-      const offset = circ * (1 - pct);
 
       let color = '#00e676';
       if (pct < 0.33) {
@@ -843,10 +832,6 @@ function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd }) {
       const glowColor = color.replace('rgb', 'rgba').replace(')', ', 0.3)');
       const shadowStyle = `0 0 10px ${glowColor}, inset 0 0 6px ${glowColor}, 0 4px 20px rgba(0,0,0,0.7)`;
 
-      if (circleRef.current) {
-        circleRef.current.style.strokeDashoffset = offset;
-        circleRef.current.style.stroke = color;
-      }
       if (textRef.current) {
         textRef.current.textContent = remainingSecs;
         textRef.current.style.color = color;
@@ -861,25 +846,13 @@ function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd }) {
     return () => {
       if (animId) cancelAnimationFrame(animId);
     };
-  }, [timerEnd, paused, timeLeft, totalTime, circ]);
+  }, [timerEnd, paused, timeLeft, totalTime, serverTimeOffset]);
 
   const stateLabel = timeLeft <= 5 ? (timeLeft <= 3 ? 'TWICE' : 'ONCE') : timeLeft <= 10 ? 'FINAL CALL' : '';
 
   return (
     <div className="ar-timer-wrap">
       <div ref={wrapRef} className="ar-timer-ring">
-        <svg className="ar-timer-svg" width="60" height="60" viewBox="0 0 60 60">
-          <circle cx="30" cy="30" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
-          <circle
-            ref={circleRef}
-            cx="30" cy="30" r={r}
-            fill="none"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeDasharray={circ}
-            strokeDashoffset={circ}
-          />
-        </svg>
         <span ref={textRef} className="ar-timer-num">{timeLeft}</span>
       </div>
       {stateLabel && (
@@ -901,7 +874,7 @@ const AR_SET_COLORS = {
 };
 
 // ── Player Card ────────────────────────────────────────────────────────────────
-function PlayerCard({ player, auctionState, currentBid, iAmHighestBidder, timeLeft, totalTime, paused, timerEnd }) {
+function PlayerCard({ player, auctionState, currentBid, iAmHighestBidder, timeLeft, totalTime, paused, timerEnd, serverTimeOffset }) {
   if (!player) return null;
   const isBidding = auctionState === 'bidding';
   const isSold = auctionState === 'sold';
@@ -1021,7 +994,7 @@ function PlayerCard({ player, auctionState, currentBid, iAmHighestBidder, timeLe
 
       {/* Timer ring — left side */}
       {isBidding && typeof timeLeft === 'number' && (
-        <TimerRing timeLeft={timeLeft} totalTime={totalTime} paused={paused} timerEnd={timerEnd} />
+        <TimerRing timeLeft={timeLeft} totalTime={totalTime} paused={paused} timerEnd={timerEnd} serverTimeOffset={serverTimeOffset} />
       )}
 
       {/* Card body */}
@@ -1159,6 +1132,80 @@ function AdminPanel({ isOwner, isHostVerified, setIsHostVerified, auction, roomA
   );
 }
 
+const validateBid = (team, player, amount, settings) => {
+  if (!team) return { ok: false, reason: 'Team not found' };
+  
+  // 1. Check purse
+  if ((team.purse || 0) < amount) {
+    return { ok: false, reason: `Insufficient purse! Remaining: ${formatPrice(team.purse)}, Bid: ${formatPrice(amount)}` };
+  }
+
+  // 2. Check max squad size
+  const maxSquad = Number(settings.maxSquadSize) || 18;
+  const currentSquadSize = (team.players || []).length;
+  if (currentSquadSize >= maxSquad) {
+    return { ok: false, reason: `Squad is already full! (Max: ${maxSquad})` };
+  }
+
+  // 3. Check overseas limit
+  const isOverseas = player.country && player.country.toLowerCase() !== 'india';
+  if (isOverseas) {
+    const overseasLimit = Number(settings.overseasLimit) || 4;
+    const currentOverseas = (team.players || []).filter(p => p.country && p.country.toLowerCase() !== 'india').length;
+    if (currentOverseas >= overseasLimit) {
+      return { ok: false, reason: `Overseas player limit reached! (Max: ${overseasLimit})` };
+    }
+  }
+
+  // 4. Check role slot balance (mathematically verify if minimums are still achievable)
+  const slotsRemaining = maxSquad - currentSquadSize;
+  const role = player.role;
+  
+  const currentBatters = (team.players || []).filter(p => p.role === 'Batter').length;
+  const currentBowlers = (team.players || []).filter(p => p.role === 'Bowler').length;
+  const currentAllRounders = (team.players || []).filter(p => p.role === 'All-Rounder').length;
+  const currentKeepers = (team.players || []).filter(p => p.role === 'WK-Batter').length;
+
+  const minBatters = Number(settings.minBatters) || 0;
+  const minBowlers = Number(settings.minBowlers) || 0;
+  const minAllRounders = Number(settings.minAllRounders) || 0;
+  const minKeepers = Number(settings.minKeepers) || 0;
+
+  const unmetBatters = Math.max(0, minBatters - (currentBatters + (role === 'Batter' ? 1 : 0)));
+  const unmetBowlers = Math.max(0, minBowlers - (currentBowlers + (role === 'Bowler' ? 1 : 0)));
+  const unmetAllRounders = Math.max(0, minAllRounders - (currentAllRounders + (role === 'All-Rounder' ? 1 : 0)));
+  const unmetKeepers = Math.max(0, minKeepers - (currentKeepers + (role === 'WK-Batter' ? 1 : 0)));
+
+  const totalUnmetRoles = unmetBatters + unmetBowlers + unmetAllRounders + unmetKeepers;
+  if (totalUnmetRoles > (slotsRemaining - 1)) {
+    const unmetList = [];
+    if (unmetBatters > 0) unmetList.push(`${unmetBatters} Batters`);
+    if (unmetBowlers > 0) unmetList.push(`${unmetBowlers} Bowlers`);
+    if (unmetAllRounders > 0) unmetList.push(`${unmetAllRounders} All-Rounders`);
+    if (unmetKeepers > 0) unmetList.push(`${unmetKeepers} Keepers`);
+    return { 
+      ok: false, 
+      reason: `Buying this player leaves only ${slotsRemaining - 1} slots, but you need at least ${totalUnmetRoles} slots to satisfy remaining requirements: ${unmetList.join(', ')}` 
+    };
+  }
+
+  // 5. Check uncapped minimums if applicable
+  const minUncapped = Number(settings.minUncapped) || 0;
+  if (minUncapped > 0) {
+    const isUncapped = !player.capped;
+    const currentUncapped = (team.players || []).filter(p => !p.capped).length;
+    const unmetUncapped = Math.max(0, minUncapped - (currentUncapped + (isUncapped ? 1 : 0)));
+    if (unmetUncapped > (slotsRemaining - 1)) {
+      return {
+        ok: false,
+        reason: `Buying this player leaves only ${slotsRemaining - 1} slots, but you need at least ${unmetUncapped} slots for Uncapped players.`
+      };
+    }
+  }
+
+  return { ok: true };
+};
+
 // ── MAIN CONTENT ───────────────────────────────────────────────────────────────
 function AuctionContent() {
   injectStyles();
@@ -1180,9 +1227,22 @@ function AuctionContent() {
   const [selectedSquadTeamId, setSelectedSquadTeamId] = useState(user?.uid || '');
   const [mobileTab, setMobileTab] = useState('auction');
   const [resumeCountdown, setResumeCountdown] = useState(null);
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
   const timerRef = useRef(null);
   const roomRef = useRef(null);
   const lastBidTimeRef = useRef(0);
+
+  // Sync server time offset
+  useEffect(() => {
+    if (!db) return;
+    const offsetRef = dbRef(db, '.info/serverTimeOffset');
+    const unsub = onValue(offsetRef, snap => {
+      if (snap.exists()) {
+        setServerTimeOffset(snap.val() || 0);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const isOwner = room?.meta?.ownerId === user?.uid;
   const auction = room?.auction;
@@ -1205,9 +1265,9 @@ function AuctionContent() {
     if (!auction?.currentPlayer) return 0;
     const base = getBasePriceInPaise(auction.currentPlayer.basePrice);
     if (!currentBid) return base;
-    return getNextBidAmount(currentBid.amount);
+    return getNextBidAmount(currentBid.amount, settings);
   })();
-  const canBid = auctionState === 'bidding' && !auction?.paused && myTeam?.purse >= nextBidAmount && !iAmHighestBidder;
+  const canBid = auctionState === 'bidding' && !auction?.paused && !iAmHighestBidder && validateBid(myTeam, auction?.currentPlayer, nextBidAmount, settings).ok;
 
   const purseMax = settings?.teamPurseAmount || 1000000000;
   const purseUsed = purseMax - (myTeam?.purse || purseMax);
@@ -1337,14 +1397,14 @@ function AuctionContent() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (auctionState !== 'bidding' || !auction?.timerEnd || auction?.paused) { setTimeLeft(0); return; }
     const tick = () => {
-      const rem = Math.max(0, Math.ceil((auction.timerEnd - Date.now()) / 1000));
+      const rem = Math.max(0, Math.ceil((auction.timerEnd - (Date.now() + serverTimeOffset)) / 1000));
       setTimeLeft(rem);
       if (rem <= 0 && isOwner) { clearInterval(timerRef.current); handleTimerExpire(); }
     };
     tick();
     timerRef.current = setInterval(tick, 300);
     return () => clearInterval(timerRef.current);
-  }, [auction?.timerEnd, auctionState, auction?.paused, isOwner]);
+  }, [auction?.timerEnd, auctionState, auction?.paused, isOwner, serverTimeOffset]);
 
   // ── Advance to next player ─────────────────────────────────────────────
   const advanceToNextPlayer = useCallback(async () => {
@@ -1376,12 +1436,12 @@ function AuctionContent() {
     setTimeout(async () => {
       await updateAuction({ state: 'revealing', currentPlayer: nextPlayer });
       setTimeout(async () => {
-        const timerEnd = Date.now() + (settings.timerDurationMs || 15000);
+        const timerEnd = (Date.now() + serverTimeOffset) + (settings.timerDurationMs || 15000);
         await updateAuction({ state: 'bidding', timerEnd });
         pushEvent({ type: 'system', icon: '🔔', msg: `Bidding open — ${nextPlayer.name} — Base: ${nextPlayer.basePrice}` });
       }, 2500);
     }, 3000);
-  }, [isOwner, room, roomId, settings.timerDurationMs, navigate, updateAuction, pushEvent, saveLocal]);
+  }, [isOwner, room, roomId, settings.timerDurationMs, navigate, updateAuction, pushEvent, saveLocal, serverTimeOffset]);
 
   // ── Timer expire ───────────────────────────────────────────────────────
   const handleTimerExpire = useCallback(async () => {
@@ -1393,21 +1453,28 @@ function AuctionContent() {
 
     if (bid) {
       const team = cur.teams?.[bid.teamId] || {};
-      const newPurse = Math.max(0, (team.purse || 0) - bid.amount);
-      const newPlayers = [...(team.players || []), { ...player, soldFor: bid.amount }];
-      const newScore = newPlayers.reduce((s, p) => s + (p.score || 0), 0);
-      await updateTeam(bid.teamId, { purse: newPurse, players: newPlayers, score: newScore });
-      await updatePlayer(player.id, { status: 'sold', boughtBy: bid.teamId, soldFor: bid.amount });
-      await updateAuction({ state: 'sold', soldCount: (cur.auction?.soldCount || 0) + 1, bidHistory: [] });
-      pushEvent({ type: 'sold', icon: '🔨', msg: `${player.name} SOLD to ${bid.teamName} for ${formatPrice(bid.amount)}!` });
-      addToast(`${player.name} sold for ${formatPrice(bid.amount)}!`, 'success', '🔨 SOLD!');
+      const validation = validateBid(team, player, bid.amount, settings);
+      if (validation.ok) {
+        const newPurse = Math.max(0, (team.purse || 0) - bid.amount);
+        const newPlayers = [...(team.players || []), { ...player, soldFor: bid.amount }];
+        const newScore = newPlayers.reduce((s, p) => s + (p.score || 0), 0);
+        await updateTeam(bid.teamId, { purse: newPurse, players: newPlayers, score: newScore });
+        await updatePlayer(player.id, { status: 'sold', boughtBy: bid.teamId, soldFor: bid.amount });
+        await updateAuction({ state: 'sold', soldCount: (cur.auction?.soldCount || 0) + 1, bidHistory: [] });
+        pushEvent({ type: 'sold', icon: '🔨', msg: `${player.name} SOLD to ${bid.teamName} for ${formatPrice(bid.amount)}!` });
+        addToast(`${player.name} sold for ${formatPrice(bid.amount)}!`, 'success', '🔨 SOLD!');
+      } else {
+        await updatePlayer(player.id, { status: 'unsold' });
+        await updateAuction({ state: 'unsold', unsoldCount: (cur.auction?.unsoldCount || 0) + 1, bidHistory: [] });
+        pushEvent({ type: 'unsold', icon: '⚠️', msg: `${player.name} went UNSOLD due to rule violation: ${validation.reason}` });
+      }
     } else {
       await updatePlayer(player.id, { status: 'unsold' });
       await updateAuction({ state: 'unsold', unsoldCount: (cur.auction?.unsoldCount || 0) + 1, bidHistory: [] });
       pushEvent({ type: 'unsold', icon: '❌', msg: `${player.name} went UNSOLD.` });
     }
     setTimeout(advanceToNextPlayer, 2800);
-  }, [isOwner, room, roomId, advanceToNextPlayer, updateTeam, updatePlayer, updateAuction, addToast, pushEvent]);
+  }, [isOwner, room, roomId, settings, advanceToNextPlayer, updateTeam, updatePlayer, updateAuction, addToast, pushEvent]);
 
   // ── Auto-start ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1421,12 +1488,13 @@ function AuctionContent() {
   useEffect(() => {
     if (!autoBid.enabled || !autoBid.maxAmount || iAmHighestBidder || auctionState !== 'bidding') return;
     if (!auction?.currentPlayer || !myTeam) return;
-    const next = currentBid ? getNextBidAmount(currentBid.amount) : getBasePriceInPaise(auction.currentPlayer.basePrice);
-    if (next <= autoBid.maxAmount && myTeam.purse >= next) {
+    const next = currentBid ? getNextBidAmount(currentBid.amount, settings) : getBasePriceInPaise(auction.currentPlayer.basePrice);
+    const validation = validateBid(myTeam, auction.currentPlayer, next, settings);
+    if (next <= autoBid.maxAmount && validation.ok) {
       const delay = setTimeout(() => placeBid(next), 800);
       return () => clearTimeout(delay);
     }
-  }, [currentBid?.amount, autoBid, iAmHighestBidder, auctionState]);
+  }, [currentBid?.amount, autoBid, iAmHighestBidder, auctionState, settings, myTeam, auction?.currentPlayer]);
 
   // ── Place Bid ──────────────────────────────────────────────────────────
   const placeBid = useCallback((forcedAmount) => {
@@ -1438,34 +1506,24 @@ function AuctionContent() {
     lastBidTimeRef.current = now;
 
     const base = getBasePriceInPaise(auction.currentPlayer.basePrice);
-    const nextAmount = forcedAmount || (currentBid ? getNextBidAmount(currentBid.amount) : base);
-    if (myTeam.purse < nextAmount) { addToast('Insufficient purse!', 'error', 'Cannot Bid'); return; }
-    if (iAmHighestBidder) { addToast("You're already leading!", 'warning'); return; }
+    const nextAmount = forcedAmount || (currentBid ? getNextBidAmount(currentBid.amount, settings) : base);
+    
+    const validation = validateBid(myTeam, auction.currentPlayer, nextAmount, settings);
+    if (!validation.ok) {
+      addToast(validation.reason, 'error', 'Cannot Bid');
+      return;
+    }
 
-    const timerEnd = Date.now() + (settings.timerDurationMs || 15000);
-    const bidData = { teamId: user.uid, teamName: user.displayName || 'Player', amount: nextAmount, timestamp: Date.now() };
+    const timerEnd = (Date.now() + serverTimeOffset) + (settings.timerDurationMs || 15000);
+    const bidData = { teamId: user.uid, teamName: user.displayName || 'Player', amount: nextAmount, timestamp: (Date.now() + serverTimeOffset) };
 
-    // Apply local optimistic updates immediately
-    const updatedHistory = [...(room?.auction?.bidHistory || []), bidData];
-    setRoom(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        auction: {
-          ...prev.auction,
-          currentBid: bidData,
-          timerEnd,
-          bidHistory: updatedHistory
-        }
-      };
-    });
     pushEvent({ type: 'bid', icon: '💰', msg: `${user.displayName || 'You'} bid ${formatPrice(nextAmount)}` });
 
     // Sync to database in background
-    updateAuction({ currentBid: bidData, timerEnd, bidHistory: updatedHistory }).catch(err => {
+    updateAuction({ currentBid: bidData, timerEnd, bidHistory: [...(room?.auction?.bidHistory || []), bidData] }).catch(err => {
       console.error('Failed to sync bid to database:', err);
     });
-  }, [auction, currentBid, myTeam, user, settings, iAmHighestBidder, updateAuction, addToast, pushEvent, setRoom]);
+  }, [auction, currentBid, room, myTeam, user, settings, iAmHighestBidder, updateAuction, addToast, pushEvent, serverTimeOffset]);
 
   // ── Admin actions ──────────────────────────────────────────────────────
   const handleStart = async () => {
@@ -1638,7 +1696,11 @@ function AuctionContent() {
               <div><div className="ar-squad-stat-lbl">Batters</div><div className="ar-squad-stat-val">{String(roleCounts['Batter'] || 0).padStart(2, '0')}</div></div>
               <div><div className="ar-squad-stat-lbl">Bowlers</div><div className="ar-squad-stat-val">{String(roleCounts['Bowler'] || 0).padStart(2, '0')}</div></div>
               <div><div className="ar-squad-stat-lbl">All-Rounders</div><div className="ar-squad-stat-val">{String(roleCounts['All-Rounder'] || 0).padStart(2, '0')}</div></div>
-              <div><div className="ar-squad-stat-lbl">Slots Left</div><div className="ar-squad-stat-val hl">{(settings.maxSquadSize || 18) - myPlayers.length}</div></div>
+              <div><div className="ar-squad-stat-lbl">Keepers</div><div className="ar-squad-stat-val">{String(roleCounts['WK-Batter'] || 0).padStart(2, '0')}</div></div>
+              <div style={{ gridColumn: 'span 2', marginTop: 4, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="ar-squad-stat-lbl">Slots Left</span>
+                <span className="ar-squad-stat-val hl" style={{ fontSize: '1.25rem' }}>{(settings.maxSquadSize || 18) - myPlayers.length}</span>
+              </div>
             </div>
           </div>
 
@@ -1705,7 +1767,7 @@ function AuctionContent() {
           {auctionState === 'revealing' && auction?.currentPlayer && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 20, width: '100%' }}>
               <div style={{ fontSize: '0.82rem', color: '#ffc107', fontWeight: 800, letterSpacing: '0.2em', animation: 'ar-blink 1.5s infinite' }}>✨ PLAYER REVEALED</div>
-              <PlayerCard player={auction.currentPlayer} auctionState="revealing" paused={auction?.paused} timerEnd={auction?.timerEnd} />
+              <PlayerCard player={auction.currentPlayer} auctionState="revealing" paused={auction?.paused} timerEnd={auction?.timerEnd} serverTimeOffset={serverTimeOffset} />
             </div>
           )}
 
@@ -1723,6 +1785,7 @@ function AuctionContent() {
                 totalTime={settings.timerDuration || 15}
                 paused={auction?.paused}
                 timerEnd={auction?.timerEnd}
+                serverTimeOffset={serverTimeOffset}
               />
 
               {/* Player counter */}
@@ -1770,13 +1833,13 @@ function AuctionContent() {
                   >
                     <span>{iAmHighestBidder ? '✅ LEADING BID' : `BID ${formatPrice(nextBidAmount)}`}</span>
                     <span className="ar-bid-btn-sub">
-                      {iAmHighestBidder ? 'You are the highest bidder' : `NEXT INCREMENT: ${formatPrice(currentBid ? getNextBidAmount(currentBid.amount) - currentBid.amount : 0)}`}
+                     {iAmHighestBidder ? 'You are the highest bidder' : `NEXT INCREMENT: ${formatPrice(currentBid ? getNextBidAmount(currentBid.amount, settings) - currentBid.amount : 0)}`}
                     </span>
                   </button>
 
                   {/* Quick bids */}
                   <div className="ar-quick-bids" style={{ marginTop: 10 }}>
-                    {getQuickBidAmounts().map(({ label, amount }) => {
+                    {getQuickBidAmounts(settings).map(({ label, amount }) => {
                       const base = currentBid?.amount || getBasePriceInPaise(auction?.currentPlayer?.basePrice || '20L');
                       const bidAmt = base + amount;
                       const disabled = !myTeam || myTeam.purse < bidAmt;
@@ -1945,6 +2008,9 @@ function AuctionContent() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700 }}>
                   <Icon name="swap_horiz" size={14} style={{ color: '#14d1ff' }} />{roleCounts['All-Rounder'] || 0} AR
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700 }}>
+                  <Icon name="public" size={14} style={{ color: '#14d1ff' }} />{roleCounts['WK-Batter'] || 0} WK
+                </div>
               </div>
             </div>
             {(isOwner || isHostVerified) && (
@@ -1990,8 +2056,9 @@ function AuctionContent() {
             {roleCounts['WK-Batter'] || 0} WK
           </div>
           <div className="ar-pill-div" />
-          <div className="ar-squad-pill-stat" style={{ color: '#14d1ff' }}>
-            📋 Squads
+          <div className="ar-squad-pill-stat">
+            <span className="ms" style={{ fontSize: 13, color: '#14d1ff' }}>swap_horiz</span>
+            {roleCounts['All-Rounder'] || 0} AR
           </div>
         </div>
       </div>
