@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { isFirebaseConfigured } from '../firebase';
+import { isFirebaseConfigured, FIREBASE_CONFIGURED } from '../firebase';
 
 const AuthContext = createContext(null);
 export function useAuth() { return useContext(AuthContext); }
@@ -359,6 +359,6 @@ function FirebaseAuthProvider({ children }) {
 }
 
 export function AuthProvider({ children }) {
-  if (!isFirebaseConfigured()) return <DemoAuthProvider>{children}</DemoAuthProvider>;
+  if (!FIREBASE_CONFIGURED) return <DemoAuthProvider>{children}</DemoAuthProvider>;
   return <FirebaseAuthProvider>{children}</FirebaseAuthProvider>;
 }
