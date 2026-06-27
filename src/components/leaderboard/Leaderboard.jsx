@@ -176,11 +176,16 @@ export default function Leaderboard() {
           {[top3[1], top3[0], top3[2]].filter(Boolean).map((p, idx) => {
             const order = idx === 0 ? 2 : idx === 1 ? 1 : 3;
             const heights = { 1: 180, 2: 150, 3: 130 };
+            const isYou = p.uid === user?.uid;
+            const displayName = isYou ? (user?.displayName || p.name) : p.name;
             return (
               <div key={p.rank} className={`podium-item podium-item-${p.rank}`} style={{ minHeight: heights[p.rank], order }}>
                 <div className="podium-rank-badge">{p.rank === 1 ? '👑' : p.badge}</div>
-                <Avatar name={p.name} size="lg" variant={p.rank === 1 ? 'gold' : p.rank === 2 ? '' : ''} />
-                <div className="podium-username">{p.name}</div>
+                <Avatar name={displayName} size="lg" variant={p.rank === 1 ? 'gold' : p.rank === 2 ? '' : ''} />
+                <div className="podium-username">
+                  {displayName}
+                  {isYou && <span style={{ display: 'block', fontSize: '0.55rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>YOU</span>}
+                </div>
                 <Badge variant={p.rank === 1 ? 'gold' : p.rank === 2 ? 'grey' : 'grey'} style={{ fontSize: '0.55rem' }}>{p.title}</Badge>
                 <div className="podium-winnings" style={{ color: rankColor(p.rank) }}>
                   {p.ppm !== undefined ? p.ppm : formatWinnings(p.winnings)}
@@ -196,14 +201,15 @@ export default function Leaderboard() {
         {/* Full list */}
         <div className="leaderboard-list" style={{ animation: 'fadeInUp 0.4s ease 0.3s both' }}>
           {rest.map((p, i) => {
-            const isYou = user?.displayName && p.name === user.displayName;
+            const isYou = p.uid === user?.uid;
+            const displayName = isYou ? (user?.displayName || p.name) : p.name;
             return (
               <div key={p.rank} id={`lb-rank-${p.rank}`} className={`leaderboard-card ${isYou ? 'you' : ''}`} style={{ animation: `fadeInUp 0.3s ease ${0.3 + i * 0.04}s both` }}>
                 <div className="rank-position" style={{ color: rankColor(p.rank) }}>#{p.rank}</div>
-                <Avatar name={p.name} size="sm" />
+                <Avatar name={displayName} size="sm" />
                 <div className="leaderboard-info">
                   <div className="leaderboard-name">
-                    {p.name}
+                    {displayName}
                     {isYou && <span style={{ marginLeft: 6, fontSize: '0.6rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>YOU</span>}
                   </div>
                   <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
