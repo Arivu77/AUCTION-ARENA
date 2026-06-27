@@ -862,15 +862,17 @@ function TimerRing({ timeLeft, totalTime = 15, paused, timerEnd, serverTimeOffse
   );
 }
 
-// ── Set color map (mirrors CreateAuction) ──────────────────────────────────────
+// ── Set color map (mirrors CreateAuction) ──────────────────────────────────────────────────
 const AR_SET_COLORS = {
-  'Marquee Set':        { bg: 'rgba(255,193,7,0.12)',   border: 'rgba(255,193,7,0.35)',   color: '#ffc107' },
-  'Batsman Set':        { bg: 'rgba(20,209,255,0.10)',  border: 'rgba(20,209,255,0.3)',   color: '#14d1ff' },
-  'Bowler Set':         { bg: 'rgba(255,60,172,0.10)',  border: 'rgba(255,60,172,0.3)',   color: '#ff3cac' },
-  'All-Rounder Set':    { bg: 'rgba(123,97,255,0.10)', border: 'rgba(123,97,255,0.3)',   color: '#7b61ff' },
-  'Wicketkeeper Set':   { bg: 'rgba(0,230,118,0.10)',  border: 'rgba(0,230,118,0.3)',    color: '#00e676' },
-  'Emerging Player Set':{ bg: 'rgba(255,138,0,0.10)',  border: 'rgba(255,138,0,0.3)',    color: '#ff8a00' },
-  'Overseas Set':       { bg: 'rgba(220,38,38,0.10)',  border: 'rgba(220,38,38,0.3)',    color: '#f87171' },
+  'Marquee Set':          { bg: 'rgba(255,193,7,0.12)',   border: 'rgba(255,193,7,0.35)',   color: '#ffc107' },
+  'Capped Batter':        { bg: 'rgba(20,209,255,0.10)',  border: 'rgba(20,209,255,0.3)',   color: '#14d1ff' },
+  'Uncapped Batter':      { bg: 'rgba(20,209,255,0.07)',  border: 'rgba(20,209,255,0.2)',   color: '#7ad8f5' },
+  'Capped Bowler':        { bg: 'rgba(255,60,172,0.10)',  border: 'rgba(255,60,172,0.3)',   color: '#ff3cac' },
+  'Uncapped Bowler':      { bg: 'rgba(255,60,172,0.07)',  border: 'rgba(255,60,172,0.2)',   color: '#f59bc8' },
+  'Capped All-rounder':   { bg: 'rgba(123,97,255,0.10)', border: 'rgba(123,97,255,0.3)',   color: '#7b61ff' },
+  'Uncapped All-rounder': { bg: 'rgba(123,97,255,0.07)', border: 'rgba(123,97,255,0.2)',   color: '#b8a9ff' },
+  'Capped Wicketkeeper':  { bg: 'rgba(0,230,118,0.10)',  border: 'rgba(0,230,118,0.3)',    color: '#00e676' },
+  'Uncapped Wicketkeeper':{ bg: 'rgba(0,230,118,0.07)',  border: 'rgba(0,230,118,0.2)',    color: '#7bdfab' },
 };
 
 // ── Player Card ────────────────────────────────────────────────────────────────
@@ -1341,7 +1343,8 @@ function AuctionContent() {
           
           let gamesPlayed = 1;
           let totalPoints = teamScore;
-          const name = team.name || 'Anonymous Team';
+          // Use displayName (profile name) if stored on the team, fall back to team name
+          const name = team.displayName || team.name || 'Anonymous';
           
           if (snap.exists()) {
             const currentData = snap.val();
@@ -1367,7 +1370,9 @@ function AuctionContent() {
           const teams = Object.entries(currentRoom.teams);
           for (const [uid, team] of teams) {
             const teamScore = team.score || 0;
-            const currentData = leaderboard[uid] || { gamesPlayed: 0, totalPoints: 0, name: team.name || 'Anonymous Team' };
+            // Use displayName (profile name) if stored, fall back to existing leaderboard name or team name
+            const profileName = team.displayName || team.name || 'Anonymous';
+            const currentData = leaderboard[uid] || { gamesPlayed: 0, totalPoints: 0, name: profileName };
             
             const gamesPlayed = currentData.gamesPlayed + 1;
             const totalPoints = currentData.totalPoints + teamScore;
@@ -1375,7 +1380,7 @@ function AuctionContent() {
             const ppm = Number((totalPoints / gamesPlayed).toFixed(2));
             leaderboard[uid] = {
               uid,
-              name: currentData.name,
+              name: team.displayName || currentData.name,
               gamesPlayed,
               totalPoints,
               scorePercentage: ppm,
@@ -2199,7 +2204,7 @@ function AuctionContent() {
                     );
                   })}
                 </div>
-                <div style={{ maxHeight: 260, overflowY: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }} className="no-scrollbar">
+                <div style={{ maxHeight: 'min(60vh, 450px)', overflowY: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
                       <tr style={{ background: 'rgba(20,209,255,0.04)' }}>
