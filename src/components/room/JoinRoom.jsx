@@ -49,6 +49,7 @@ function JoinRoomForm() {
               const existingTeam = room.teams?.[user.uid];
               const teamData = {
                 name: teamName.trim(),
+                displayName: user?.displayName || teamName.trim(),
                 avatar: user?.photoURL || '',
                 purse: existingTeam ? (existingTeam.purse !== undefined ? existingTeam.purse : (room.meta?.settings?.teamPurseAmount || 1000000000)) : (room.meta?.settings?.teamPurseAmount || 1000000000),
                 score: existingTeam ? (existingTeam.score !== undefined ? existingTeam.score : 0) : 0,
@@ -84,6 +85,7 @@ function JoinRoomForm() {
             const existingTeam = data.teams[user.uid];
             data.teams[user.uid] = {
               name: teamName.trim(),
+              displayName: user?.displayName || teamName.trim(),
               avatar: user?.photoURL || '',
               purse: existingTeam ? (existingTeam.purse !== undefined ? existingTeam.purse : (data.meta?.settings?.teamPurseAmount || 1000000000)) : (data.meta?.settings?.teamPurseAmount || 1000000000),
               score: existingTeam ? (existingTeam.score !== undefined ? existingTeam.score : 0) : 0,
