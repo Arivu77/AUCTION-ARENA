@@ -17,13 +17,15 @@ const DEFAULTS = {
 
 // ── SET badge colors ───────────────────────────────────────────────────────────
 const SET_COLORS = {
-  'Marquee Set':       { bg: 'rgba(255,193,7,0.12)',   border: 'rgba(255,193,7,0.35)',   color: '#ffc107' },
-  'Batsman Set':       { bg: 'rgba(20,209,255,0.10)',  border: 'rgba(20,209,255,0.3)',   color: '#14d1ff' },
-  'Bowler Set':        { bg: 'rgba(255,60,172,0.10)',  border: 'rgba(255,60,172,0.3)',   color: '#ff3cac' },
-  'All-Rounder Set':   { bg: 'rgba(123,97,255,0.10)', border: 'rgba(123,97,255,0.3)',   color: '#7b61ff' },
-  'Wicketkeeper Set':  { bg: 'rgba(0,230,118,0.10)',  border: 'rgba(0,230,118,0.3)',    color: '#00e676' },
-  'Emerging Player Set':{ bg: 'rgba(255,138,0,0.10)', border: 'rgba(255,138,0,0.3)',    color: '#ff8a00' },
-  'Overseas Set':      { bg: 'rgba(220,38,38,0.10)',  border: 'rgba(220,38,38,0.3)',    color: '#f87171' },
+  'Marquee Set':          { bg: 'rgba(255,193,7,0.12)',   border: 'rgba(255,193,7,0.35)',   color: '#ffc107' },
+  'Capped Batter':        { bg: 'rgba(20,209,255,0.10)',  border: 'rgba(20,209,255,0.3)',   color: '#14d1ff' },
+  'Uncapped Batter':      { bg: 'rgba(20,209,255,0.07)',  border: 'rgba(20,209,255,0.2)',   color: '#7ad8f5' },
+  'Capped Bowler':        { bg: 'rgba(255,60,172,0.10)',  border: 'rgba(255,60,172,0.3)',   color: '#ff3cac' },
+  'Uncapped Bowler':      { bg: 'rgba(255,60,172,0.07)',  border: 'rgba(255,60,172,0.2)',   color: '#f59bc8' },
+  'Capped All-rounder':   { bg: 'rgba(123,97,255,0.10)', border: 'rgba(123,97,255,0.3)',   color: '#7b61ff' },
+  'Uncapped All-rounder': { bg: 'rgba(123,97,255,0.07)', border: 'rgba(123,97,255,0.2)',   color: '#b8a9ff' },
+  'Capped Wicketkeeper':  { bg: 'rgba(0,230,118,0.10)',  border: 'rgba(0,230,118,0.3)',    color: '#00e676' },
+  'Uncapped Wicketkeeper':{ bg: 'rgba(0,230,118,0.07)',  border: 'rgba(0,230,118,0.2)',    color: '#7bdfab' },
 };
 
 function SetBadge({ set }) {
@@ -208,7 +210,7 @@ const getVal = (obj, keys, defaultVal = '') => {
 /** Normalize a raw player row from any import format into our data model */
 const normalizePlayer = (p, i) => {
   const name = getVal(p, ['name', 'player name', 'player_name', 'playerName', 'player']);
-  const set = getVal(p, ['set', 'category', 'player set', 'playerset', 'group']);
+  const setRaw = getVal(p, ['set', 'player set', 'playerset', 'group']);
   let imageUrl = getVal(p, ['imageUrl', 'image url', 'image_url', 'image', 'photo', 'pic', 'link', 'player image', 'playerimage']);
   if (imageUrl && typeof imageUrl === 'string') {
     imageUrl = imageUrl.trim();
@@ -226,13 +228,25 @@ const normalizePlayer = (p, i) => {
   const strikeRate = Number(getVal(p, ['strikeRate', 'sr', 'strike rate', 'strike_rate'], 0));
   const wickets = Number(getVal(p, ['wickets', 'wkt', 'wkts'], 0));
   const economy = Number(getVal(p, ['economy', 'econ', 'economy rate', 'economy_rate'], 0));
-  const cappedRaw = String(getVal(p, ['capped', 'capped status', 'is capped', 'iscapped'], 'true')).toLowerCase();
-  const capped = cappedRaw === 'true' || cappedRaw === 'yes' || cappedRaw === '1';
+
+  // Parse Capped/Uncapped column first, then fall back to the 'capped' boolean column
+  const cappedUncappedRaw = String(getVal(p, ['capped/uncapped', 'capped uncapped', 'capped_uncapped', 'cappeduncapped', 'status'], '')).toLowerCase();
+  let cappedFromColumn;
+  if (cappedUncappedRaw === 'capped') cappedFromColumn = true;
+  else if (cappedUncappedRaw === 'uncapped') cappedFromColumn = false;
+  else {
+    const cappedRaw = String(getVal(p, ['capped', 'capped status', 'is capped', 'iscapped'], 'true')).toLowerCase();
+    cappedFromColumn = cappedRaw === 'true' || cappedRaw === 'yes' || cappedRaw === '1';
+  }
+  const capped = cappedFromColumn;
+
+  // Resolve set: use explicit set column if given, otherwise infer from role+capped
+  const set = setRaw || inferSet({ role, country, capped, category: setRaw });
 
   return {
     id: `c${i}`,
     name,
-    set: set || inferSet({ role, country, category: set }),
+    set,
     imageUrl,
     role,
     country,
@@ -244,7 +258,7 @@ const normalizePlayer = (p, i) => {
     wickets,
     economy,
     capped,
-    category: set || 'Custom',
+    category: setRaw || 'Custom',
   };
 };
 
@@ -310,8 +324,8 @@ function Step3({
   };
 
   const downloadTemplate = async (format) => {
-    const headers = ['Set', 'Player Name', 'Image URL', 'Role', 'Country', 'Base Price', 'Rating', 'Age', 'Bat Avg', 'SR', 'Wickets', 'Economy'];
-    const sampleRow = ['Marquee Set', 'Virat Kohli', '', 'Batter', 'India', '20Cr', '98', '35', '55.8', '143.2', '0', '0'];
+    const headers = ['Set', 'Player Name', 'Image URL', 'Role', 'Country', 'Base Price', 'Rating', 'Age', 'Bat Avg', 'SR', 'Wickets', 'Economy', 'Capped/Uncapped'];
+    const sampleRow = ['Marquee Set', 'Virat Kohli', '', 'Batter', 'India', '20Cr', '98', '35', '55.8', '143.2', '0', '0', 'Capped'];
 
     if (format === 'csv') {
       const csv = [headers.join(','), sampleRow.join(',')].join('\n');
@@ -323,7 +337,7 @@ function Step3({
         const XLSX = XLSXModule.default || XLSXModule;
         const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
         // Style the header row (column widths)
-        ws['!cols'] = headers.map((h, i) => ({ wch: [14, 20, 30, 14, 14, 12, 8, 6, 10, 8, 10, 10][i] }));
+        ws['!cols'] = headers.map((h, i) => ({ wch: [22, 20, 30, 14, 14, 12, 8, 6, 10, 8, 10, 10, 16][i] }));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Players');
         // Add a Sets reference sheet
@@ -339,6 +353,7 @@ function Step3({
         set: 'Marquee Set', name: 'Virat Kohli', imageUrl: '', role: 'Batter',
         country: 'India', basePrice: '20Cr', score: 98, age: 35,
         battingAvg: 55.8, strikeRate: 143.2, wickets: 0, economy: 0,
+        'capped/uncapped': 'Capped',
       }], null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ipl-players-template.json'; a.click();
@@ -874,7 +889,7 @@ function CreateAuctionForm() {
           code: roomCode, adminKey, status: 'lobby', createdAt: Date.now(),
           settings: { ...settings, timerDurationMs: settings.timerDuration * 1000, teamPurseAmount: settings.teamPurse * 10000000 },
         },
-        teams: { [user.uid]: { name: teamName.trim() || user.displayName || 'Host', avatar: userProfile?.avatar || '', purse: settings.teamPurse * 10000000, score: 0, players: [] } },
+        teams: { [user.uid]: { name: teamName.trim() || user.displayName || 'Host', displayName: user.displayName || 'Host', avatar: userProfile?.avatar || '', purse: settings.teamPurse * 10000000, score: 0, players: [] } },
         players: playersObj,
         auction: { state: 'idle', currentPlayer: null, currentBid: null, timerEnd: null, paused: false, pauseVotes: {}, pauseRequester: null, playerQueue: queue, originalQueue: [...queue], soldCount: 0, unsoldCount: 0 },
         chat: {}, presence: { [user.uid]: { name: user.displayName, online: true, joinedAt: Date.now() } },
